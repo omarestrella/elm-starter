@@ -1,0 +1,7 @@
+# Build artifacts
+dist
+.cache
+elm-stuff
+
+# Node
+node_modules
