@@ -1,4 +1,4 @@
-module Routing exposing (Route(..), routeLink, routeTo)
+module Routing exposing (Route(..), routeFromUrl, routeLink, routeTo)
 
 import Browser.Navigation as Navigation
 import Html exposing (Html, a, text)
@@ -10,7 +10,7 @@ import Url.Parser as Parser exposing ((</>), Parser, int, map, oneOf, parse, s, 
 
 
 type Route
-    = PageRoute Int
+    = PostRoute Int
     | HomeRoute
     | NotFoundRoute
 
@@ -23,9 +23,9 @@ pushRouteUrl route key =
 routePath : Route -> String
 routePath route =
     case route of
-        PageRoute page ->
+        PostRoute page ->
             Builder.absolute
-                [ "page", String.fromInt page ]
+                [ "post", String.fromInt page ]
                 []
 
         HomeRoute ->
@@ -39,18 +39,14 @@ parseRoute : Parser (Route -> a) a
 parseRoute =
     oneOf
         [ map HomeRoute
-            (s "/")
-        , map PageRoute
-            (s "page" </> int)
+            top
+        , map PostRoute
+            (s "post" </> int)
         ]
 
 
-extractRoute : Url -> Route
-extractRoute url =
-    let
-        _ =
-            Debug.log "df" url
-    in
+routeFromUrl : Url -> Route
+routeFromUrl url =
     case parse parseRoute url of
         Just route ->
             route
@@ -79,6 +75,6 @@ routeTo : Navigation.Key -> Url -> Cmd msg
 routeTo key url =
     let
         route =
-            extractRoute url
+            routeFromUrl url
     in
     pushRouteUrl route key

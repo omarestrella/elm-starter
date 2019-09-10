@@ -1,4 +1,6 @@
-import { Elm } from '../app/Main.elm';
+import "../style/main.less";
+
+import { Elm } from "../app/Main.elm";
 
 // A weird parcel error can happen during hotswap
 // Best to just reload the whole app
@@ -11,6 +13,6 @@ if (module && module.hot) {
 }
 
 const app = Elm.Main.init({
-  node: document.getElementById('root'),
-  flags: ''
+  node: document.getElementById("root"),
+  flags: ""
 });

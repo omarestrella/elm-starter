@@ -2,8 +2,11 @@ module Main exposing (main)
 
 import Browser exposing (Document, UrlRequest(..))
 import Browser.Navigation as Navigation
-import Html exposing (Html, div, text)
-import Routing exposing (Route(..), routeLink, routeTo)
+import Html exposing (Html, div, span, text)
+import Html.Attributes exposing (class)
+import Page.Home as Home
+import Page.Post as Post
+import Routing exposing (Route(..))
 import Url exposing (Url)
 
 
@@ -15,31 +18,63 @@ type Msg
     = NoOp
     | ClickedLink UrlRequest
     | ChangedUrl Url
+    | GotPostMsg Post.Msg
+    | GotHomeMsg Home.Msg
+
+
+type PageModel
+    = Home Home.Model
+    | Post Post.Model
+    | NotFound
 
 
 type alias Model =
-    { navKey : Navigation.Key }
-
-
-defaultModel =
-    {}
+    { navKey : Navigation.Key
+    , currentRoute : Route
+    , pageModel : PageModel
+    }
 
 
 
 -- Update
 
 
+updateModel : (subModel -> PageModel) -> (subMsg -> Msg) -> Model -> ( subModel, Cmd subMsg ) -> ( Model, Cmd Msg )
+updateModel toModel toMsg model ( subModel, subCmd ) =
+    let
+        pageModel =
+            toModel subModel
+    in
+    ( { model | pageModel = pageModel }
+    , Cmd.map toMsg subCmd
+    )
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
         route =
-            routeTo model.navKey
+            Routing.routeTo model.navKey
     in
-    case msg of
-        ChangedUrl url ->
-            ( model, Cmd.none )
+    case ( msg, model.pageModel ) of
+        -- Handle messages from individual pages
+        ( GotPostMsg postMsg, Post postModel ) ->
+            Post.update postMsg postModel
+                |> updateModel Post GotPostMsg model
 
-        ClickedLink request ->
+        ( GotHomeMsg homeMsg, Home homeModel ) ->
+            Home.update homeMsg homeModel
+                |> updateModel Home GotHomeMsg model
+
+        -- Handle URL changes
+        ( ChangedUrl url, _ ) ->
+            let
+                currentRoute =
+                    Routing.routeFromUrl url
+            in
+            ( { model | currentRoute = currentRoute, pageModel = defaultPageModel currentRoute }, Cmd.none )
+
+        ( ClickedLink request, _ ) ->
             case request of
                 Internal url ->
                     ( model
@@ -49,8 +84,28 @@ update msg model =
                 External url ->
                     ( model, Navigation.load url )
 
-        NoOp ->
+        ( NoOp, _ ) ->
             ( model, Cmd.none )
+
+        -- Mismatched messages dont do anything
+        ( GotHomeMsg _, _ ) ->
+            ( model, Cmd.none )
+
+        ( GotPostMsg _, _ ) ->
+            ( model, Cmd.none )
+
+
+defaultPageModel : Route -> PageModel
+defaultPageModel route =
+    case route of
+        PostRoute post ->
+            Post (Post.defaultModel (Just post))
+
+        HomeRoute ->
+            Home Home.defaultModel
+
+        NotFoundRoute ->
+            NotFound
 
 
 
@@ -59,17 +114,32 @@ update msg model =
 
 navView : Html Msg
 navView =
-    div []
-        [ div [] [ routeLink "Home" ( HomeRoute, Nothing ) ]
-        , div [] [ routeLink "Page 1" ( PageRoute 1, Nothing ) ]
+    div [ class "navigation" ]
+        [ span [] [ Routing.routeLink "Home" ( HomeRoute, Nothing ) ]
+        , span [] [ Routing.routeLink "Post 1" ( PostRoute 1, Nothing ) ]
         ]
+
+
+pageView : Model -> Html Msg
+pageView model =
+    case model.pageModel of
+        Home homeModel ->
+            Home.view homeModel
+                |> Html.map GotHomeMsg
+
+        Post postModel ->
+            Post.view postModel
+                |> Html.map GotPostMsg
+
+        NotFound ->
+            div [] [ text "Not found!" ]
 
 
 mainView : Model -> Html Msg
 mainView model =
-    div []
+    div [ class "main" ]
         [ navView
-        , div [] [ text "Welcome to a basic Elm application!" ]
+        , pageView model
         ]
 
 
@@ -86,7 +156,16 @@ view model =
 
 init : String -> Url -> Navigation.Key -> ( Model, Cmd Msg )
 init _ url key =
-    ( { navKey = key }, Cmd.none )
+    let
+        currentRoute =
+            Routing.routeFromUrl url
+    in
+    ( { navKey = key, currentRoute = currentRoute, pageModel = Home {} }
+    , Cmd.batch
+        [ Routing.routeTo key url
+        , Cmd.none
+        ]
+    )
 
 
 main : Program String Model Msg
