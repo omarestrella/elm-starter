@@ -2,11 +2,13 @@ module Main exposing (main)
 
 import Browser exposing (Document, UrlRequest(..))
 import Browser.Navigation as Navigation
-import Html exposing (Html, div, span, text)
-import Html.Attributes exposing (class)
+import Html exposing (Html, a, div, span, text)
+import Html.Attributes exposing (class, href)
+import Html.Events exposing (onClick)
 import Page.Home as Home
 import Page.Post as Post
 import Routing exposing (Route(..))
+import Session exposing (Session)
 import Url exposing (Url)
 
 
@@ -18,6 +20,7 @@ type Msg
     = NoOp
     | ClickedLink UrlRequest
     | ChangedUrl Url
+    | LoggedIn
     | GotPostMsg Post.Msg
     | GotHomeMsg Home.Msg
 
@@ -29,7 +32,7 @@ type PageModel
 
 
 type alias Model =
-    { navKey : Navigation.Key
+    { session : Session
     , currentRoute : Route
     , pageModel : PageModel
     }
@@ -54,7 +57,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
         route =
-            Routing.routeTo model.navKey
+            Routing.routeTo model.session.key
     in
     case ( msg, model.pageModel ) of
         -- Handle messages from individual pages
@@ -86,6 +89,17 @@ update msg model =
 
         ( NoOp, _ ) ->
             ( model, Cmd.none )
+
+        -- Dummy login to set session user
+        ( LoggedIn, _ ) ->
+            let
+                session =
+                    model.session
+
+                updatedSession =
+                    { session | user = Session.User { firstName = "Marcus", lastName = "Aurelius" } }
+            in
+            ( { model | session = updatedSession }, Cmd.none )
 
         -- Mismatched messages dont do anything
         ( GotHomeMsg _, _ ) ->
@@ -120,6 +134,24 @@ navView =
         ]
 
 
+userView : Session.User -> Html Msg
+userView user =
+    case user of
+        Session.Guest ->
+            div []
+                [ text "Welcome, guest!"
+                , text " "
+                , a [ href "#", onClick LoggedIn ] [ text "Login" ]
+                ]
+
+        Session.User data ->
+            let
+                name =
+                    data.firstName ++ data.lastName
+            in
+            div [] [ text ("Welcome, " ++ name) ]
+
+
 pageView : Model -> Html Msg
 pageView model =
     case model.pageModel of
@@ -139,6 +171,7 @@ mainView : Model -> Html Msg
 mainView model =
     div [ class "main" ]
         [ navView
+        , userView model.session.user
         , pageView model
         ]
 
@@ -159,8 +192,13 @@ init _ url key =
     let
         currentRoute =
             Routing.routeFromUrl url
+
+        session =
+            { key = key
+            , user = Session.Guest
+            }
     in
-    ( { navKey = key, currentRoute = currentRoute, pageModel = Home {} }
+    ( { session = session, currentRoute = currentRoute, pageModel = Home Home.defaultModel }
     , Cmd.batch
         [ Routing.routeTo key url
         , Cmd.none

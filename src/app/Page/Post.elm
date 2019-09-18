@@ -4,17 +4,17 @@ import Html exposing (Html, div, text)
 
 
 type Msg
-    = LoadPage Page
+    = LoadPost Post
     | NoOp
 
 
-type Page
-    = PageFound Int
+type Post
+    = PostFound Int
     | NotFound
 
 
 type alias Model =
-    { currentPage : Page
+    { currentPost : Post
     }
 
 
@@ -22,11 +22,11 @@ defaultModel : Maybe Int -> Model
 defaultModel num =
     case num of
         Just page ->
-            { currentPage = PageFound page
+            { currentPost = PostFound page
             }
 
         Nothing ->
-            { currentPage = NotFound }
+            { currentPost = NotFound }
 
 
 
@@ -36,8 +36,8 @@ defaultModel num =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        LoadPage page ->
-            ( model, Cmd.none )
+        LoadPost post ->
+            ( { model | currentPost = post }, Cmd.none )
 
         NoOp ->
             ( model, Cmd.none )
@@ -48,5 +48,10 @@ update msg model =
 
 
 view : Model -> Html Msg
-view _ =
-    div [] [ text "Viewing a page!" ]
+view model =
+    case model.currentPost of
+        PostFound post ->
+            div [] [ text ("Viewing post: " ++ String.fromInt post) ]
+
+        NotFound ->
+            div [] [ text "Post not found :(" ]
